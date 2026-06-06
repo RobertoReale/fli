@@ -825,6 +825,7 @@ def _execute_date_search(params: DateSearchParams) -> dict[str, Any]:
         else:
             durations_to_search = [params.trip_duration] if params.is_round_trip else [None]
 
+        trip_type = TripType.ROUND_TRIP if params.is_round_trip else TripType.ONE_WAY
         currency = parse_currency(params.currency)
         search_client = SearchDates()
         all_results = []
