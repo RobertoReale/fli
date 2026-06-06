@@ -339,6 +339,26 @@ def test_dates_conflict_duration(runner, mock_search_dates, mock_console):
     assert "Cannot specify both" in result.stdout
 
 
+def test_dates_return_time_without_round_fails(runner, mock_search_dates, mock_console):
+    """--return-time without --round should exit with an error."""
+    result = runner.invoke(
+        app,
+        ["dates", "JFK", "LAX", "--return-time", "16-22"],
+    )
+    assert result.exit_code == 1
+    assert "--return-time requires --round" in result.stdout
+
+
+def test_dates_min_duration_without_max_fails(runner, mock_search_dates, mock_console):
+    """--min-duration without --max-duration should exit with an error."""
+    result = runner.invoke(
+        app,
+        ["dates", "JFK", "LAX", "--round", "--min-duration", "3"],
+    )
+    assert result.exit_code == 1
+    assert "--min-duration requires --max-duration" in result.stdout
+
+
 def test_dates_return_time_accepted(runner, mock_search_dates, mock_console):
     """--return-time is accepted without error on a round-trip dates search."""
     mock_search_dates.search.return_value = [

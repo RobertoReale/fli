@@ -303,6 +303,9 @@ def dates(
         if (min_duration is not None or max_duration is not None) and not is_round_trip:
             raise ValueError("--min-duration and --max-duration require --round")
 
+        if return_departure_window is not None and not is_round_trip:
+            raise ValueError("--return-time requires --round")
+
         # Parse parameters using shared utilities
         origin_airport = resolve_airport(origin)
         destination_airport = resolve_airport(destination)
@@ -388,9 +391,7 @@ def dates(
             if max_duration is not None:
                 actual_max = max_duration
             else:
-                from_dt = datetime.strptime(start_date, "%Y-%m-%d")
-                to_dt = datetime.strptime(end_date, "%Y-%m-%d")
-                actual_max = max(actual_min, (to_dt - from_dt).days)
+                raise ValueError("--min-duration requires --max-duration")
             if actual_min > actual_max:
                 raise ValueError(
                     f"--min-duration ({actual_min}) must not exceed --max-duration ({actual_max})"
