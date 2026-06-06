@@ -89,6 +89,7 @@ def dates(
         typer.Option(
             "--min-duration",
             help="Minimum trip duration in days (requires --round)",
+            min=1,
         ),
     ] = None,
     max_duration: Annotated[
@@ -96,6 +97,7 @@ def dates(
         typer.Option(
             "--max-duration",
             help="Maximum trip duration in days (requires --round)",
+            min=1,
         ),
     ] = None,
     airlines: Annotated[
@@ -365,6 +367,10 @@ def dates(
                 from_dt = datetime.strptime(start_date, "%Y-%m-%d")
                 to_dt = datetime.strptime(end_date, "%Y-%m-%d")
                 actual_max = max(actual_min, (to_dt - from_dt).days)
+            if actual_min > actual_max:
+                raise ValueError(
+                    f"--min-duration ({actual_min}) must not exceed --max-duration ({actual_max})"
+                )
             durations_to_search = list(range(actual_min, actual_max + 1))
         else:
             durations_to_search = [trip_duration] if trip_type == TripType.ROUND_TRIP else [None]

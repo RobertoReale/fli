@@ -815,6 +815,12 @@ def _execute_date_search(params: DateSearchParams) -> dict[str, Any]:
                 from_dt = datetime.strptime(params.start_date, "%Y-%m-%d")
                 to_dt = datetime.strptime(params.end_date, "%Y-%m-%d")
                 actual_max = max(actual_min, (to_dt - from_dt).days)
+            if actual_min > actual_max:
+                return {
+                    "success": False,
+                    "error": f"min_duration ({actual_min}) must not exceed max_duration ({actual_max})",
+                    "dates": [],
+                }
             durations_to_search = list(range(actual_min, actual_max + 1))
         else:
             durations_to_search = [params.trip_duration] if params.is_round_trip else [None]
