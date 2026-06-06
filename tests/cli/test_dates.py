@@ -337,3 +337,20 @@ def test_dates_conflict_duration(runner, mock_search_dates, mock_console):
     )
     assert result.exit_code == 1
     assert "Cannot specify both" in result.stdout
+
+
+def test_dates_return_time_accepted(runner, mock_search_dates, mock_console):
+    """--return-time is accepted without error on a round-trip dates search."""
+    mock_search_dates.search.return_value = [
+        DatePrice(
+            date=(datetime.now() + timedelta(days=1), datetime.now() + timedelta(days=8)),
+            price=299.0,
+        )
+    ]
+    result = runner.invoke(
+        app,
+        ["dates", "JFK", "LAX", "--round", "--duration", "7", "--time", "6-16",
+         "--return-time", "8-22"],
+    )
+    assert result.exit_code == 0
+    mock_search_dates.search.assert_called_once()

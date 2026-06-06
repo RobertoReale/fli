@@ -114,6 +114,9 @@ class FlightSearchParams(BaseModel):
     departure_window: str | None = Field(
         None, description="Preferred departure time window in 'HH-HH' 24h format (e.g., '6-20')"
     )
+    return_departure_window: str | None = Field(
+        None, description="Preferred return departure time window in 'HH-HH' 24h format"
+    )
     airlines: list[str] | None = Field(
         None, description="Filter by airline IATA codes (e.g., ['BA', 'AA'])"
     )
@@ -218,6 +221,9 @@ class DateSearchParams(BaseModel):
     )
     departure_window: str | None = Field(
         None, description="Preferred departure time window in 'HH-HH' 24h format (e.g., '6-20')"
+    )
+    return_departure_window: str | None = Field(
+        None, description="Preferred return departure time window in 'HH-HH' 24h format"
     )
     sort_by_price: bool = Field(False, description="Sort results by price (lowest first)")
     passengers: int = Field(
@@ -561,6 +567,11 @@ def _build_flight_filters(
     # Build time restrictions
     departure_window = params.departure_window or CONFIG.default_departure_window
     time_restrictions = build_time_restrictions(departure_window) if departure_window else None
+    
+    return_departure_window = params.return_departure_window
+    return_time_restrictions = (
+        build_time_restrictions(return_departure_window) if return_departure_window else False
+    )
 
     # Build flight segments (pass full lists for multi-airport support)
     segments, trip_type = build_flight_segments(
@@ -569,6 +580,7 @@ def _build_flight_filters(
         departure_date=params.departure_date,
         return_date=params.return_date,
         time_restrictions=time_restrictions,
+        return_time_restrictions=return_time_restrictions,
     )
 
     # Parse new filters
@@ -774,14 +786,23 @@ def _execute_booking_options(
 def _execute_date_search(params: DateSearchParams) -> dict[str, Any]:
     """Execute a date search and return formatted results."""
     try:
-        if (params.min_duration is not None or params.max_duration is not None) and params.trip_duration is not None:
-            return {"success": False, "error": "Cannot specify both trip_duration and min/max duration", "dates": []}
-            
-        if params.trip_duration is None and params.min_duration is None and params.max_duration is None:
+        has_range = params.min_duration is not None or params.max_duration is not None
+        if has_range and params.trip_duration is not None:
+            return {
+                "success": False,
+                "error": "Cannot specify both trip_duration and min/max duration",
+                "dates": [],
+            }
+
+        if params.trip_duration is None and not has_range:
             params.trip_duration = 3
-            
-        if (params.min_duration is not None or params.max_duration is not None) and not params.is_round_trip:
-            return {"success": False, "error": "min_duration and max_duration require is_round_trip to be true", "dates": []}
+
+        if has_range and not params.is_round_trip:
+            return {
+                "success": False,
+                "error": "min_duration and max_duration require is_round_trip to be true",
+                "dates": [],
+            }
 
         # Parse inputs using shared utilities (supports comma-separated multi-airport)
         origins = _resolve_airports(params.origin)
@@ -796,6 +817,11 @@ def _execute_date_search(params: DateSearchParams) -> dict[str, Any]:
         # Build time restrictions
         departure_window = params.departure_window or CONFIG.default_departure_window
         time_restrictions = build_time_restrictions(departure_window) if departure_window else None
+
+        return_departure_window = params.return_departure_window
+        return_time_restrictions = (
+            build_time_restrictions(return_departure_window) if return_departure_window else False
+        )
 
         layover_restrictions = None
         if params.min_layover is not None or params.max_layover is not None:
@@ -816,9 +842,10 @@ def _execute_date_search(params: DateSearchParams) -> dict[str, Any]:
                 to_dt = datetime.strptime(params.end_date, "%Y-%m-%d")
                 actual_max = max(actual_min, (to_dt - from_dt).days)
             if actual_min > actual_max:
+                msg = f"min_duration ({actual_min}) must not exceed max_duration ({actual_max})"
                 return {
                     "success": False,
-                    "error": f"min_duration ({actual_min}) must not exceed max_duration ({actual_max})",
+                    "error": msg,
                     "dates": [],
                 }
             durations_to_search = list(range(actual_min, actual_max + 1))
@@ -843,6 +870,7 @@ def _execute_date_search(params: DateSearchParams) -> dict[str, Any]:
                 trip_duration=current_duration if current_duration is not None else 3,
                 is_round_trip=params.is_round_trip,
                 time_restrictions=time_restrictions,
+                return_time_restrictions=return_time_restrictions,
             )
 
             # Create search filters
@@ -949,6 +977,10 @@ def search_flights(
         str | None,
         Field(description="Departure time window in 'HH-HH' 24h format (e.g., '6-20')"),
     ] = None,
+    return_departure_window: Annotated[
+        str | None,
+        Field(description="Return departure time window in 'HH-HH' 24h format (e.g., '6-20')"),
+    ] = None,
     airlines: Annotated[
         list[str] | None,
         Field(description="Filter by airline IATA codes (e.g., ['BA', 'AA'])"),
@@ -1042,6 +1074,7 @@ def search_flights(
         departure_date=departure_date,
         return_date=return_date,
         departure_window=effective_departure_window,
+        return_departure_window=return_departure_window,
         airlines=airlines,
         cabin_class=cabin_class,
         max_stops=max_stops,
@@ -1125,6 +1158,10 @@ def search_dates(
         str | None,
         Field(description="Departure time window in 'HH-HH' 24h format (e.g., '6-20')"),
     ] = None,
+    return_departure_window: Annotated[
+        str | None,
+        Field(description="Return departure time window in 'HH-HH' 24h format (e.g., '6-20')"),
+    ] = None,
     sort_by_price: Annotated[
         bool,
         Field(description="Sort results by price (lowest first)"),
@@ -1185,6 +1222,7 @@ def search_dates(
         cabin_class=cabin_class,
         max_stops=max_stops,
         departure_window=effective_departure_window,
+        return_departure_window=return_departure_window,
         sort_by_price=sort_by_price,
         passengers=passengers or CONFIG.default_passengers,
         currency=currency,
@@ -1272,6 +1310,10 @@ def get_booking_options(
         str | None,
         Field(description="Departure time window in 'HH-HH' 24h format (e.g., '6-20')"),
     ] = None,
+    return_departure_window: Annotated[
+        str | None,
+        Field(description="Return departure time window in 'HH-HH' 24h format (e.g., '6-20')"),
+    ] = None,
     sort_by: Annotated[
         str,
         Field(
@@ -1334,6 +1376,7 @@ def get_booking_options(
         departure_date=departure_date,
         return_date=return_date,
         departure_window=effective_departure_window,
+        return_departure_window=return_departure_window,
         cabin_class=cabin_class,
         max_stops=max_stops,
         sort_by=sort_by,

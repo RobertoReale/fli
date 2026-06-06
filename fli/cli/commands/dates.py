@@ -203,6 +203,14 @@ def dates(
             help="Departure time window in 24h format (e.g., 6-20)",
         ),
     ] = None,
+    return_departure_window: Annotated[
+        str | None,
+        typer.Option(
+            "--return-time",
+            "-T",
+            help="Return departure time window in 24h format (e.g., 6-20)",
+        ),
+    ] = None,
     output_format: Annotated[
         OutputFormat,
         typer.Option(
@@ -284,6 +292,7 @@ def dates(
         start_date = normalize_cli_date(start_date)
         end_date = normalize_cli_date(end_date)
         departure_window = normalize_cli_time_range(departure_window)
+        return_departure_window = normalize_cli_time_range(return_departure_window)
 
         if (min_duration is not None or max_duration is not None) and trip_duration is not None:
             raise ValueError("Cannot specify both --duration and --min-duration/--max-duration")
@@ -327,6 +336,11 @@ def dates(
             "departure_window": (
                 f"{departure_window[0]}-{departure_window[1]}" if departure_window else None
             ),
+            "return_departure_window": (
+                f"{return_departure_window[0]}-{return_departure_window[1]}"
+                if return_departure_window
+                else None
+            ),
             "airlines": (
                 [airline.name.lstrip("_") for airline in parsed_airlines]
                 if parsed_airlines
@@ -343,6 +357,16 @@ def dates(
             time_restrictions = TimeRestrictions(
                 earliest_departure=start_hour,
                 latest_departure=end_hour,
+                earliest_arrival=None,
+                latest_arrival=None,
+            )
+
+        return_time_restrictions = False
+        if return_departure_window:
+            r_start_hour, r_end_hour = return_departure_window
+            return_time_restrictions = TimeRestrictions(
+                earliest_departure=r_start_hour,
+                latest_departure=r_end_hour,
                 earliest_arrival=None,
                 latest_arrival=None,
             )
@@ -391,6 +415,7 @@ def dates(
                 trip_duration=current_duration if current_duration is not None else 3,
                 is_round_trip=is_round_trip,
                 time_restrictions=time_restrictions,
+                return_time_restrictions=return_time_restrictions,
             )
 
             # Create search filters
@@ -502,6 +527,11 @@ def dates(
                             if isinstance(departure_window, tuple)
                             else departure_window
                         ),
+                        "return_departure_window": (
+                            f"{return_departure_window[0]}-{return_departure_window[1]}"
+                            if isinstance(return_departure_window, tuple)
+                            else return_departure_window
+                        ),
                         "airlines": airlines,
                         "sort_by_price": sort_by_price,
                         "days": [
@@ -558,6 +588,11 @@ def dates(
                             f"{departure_window[0]}-{departure_window[1]}"
                             if isinstance(departure_window, tuple)
                             else departure_window
+                        ),
+                        "return_departure_window": (
+                            f"{return_departure_window[0]}-{return_departure_window[1]}"
+                            if isinstance(return_departure_window, tuple)
+                            else return_departure_window
                         ),
                         "airlines": airlines,
                         "sort_by_price": sort_by_price,
